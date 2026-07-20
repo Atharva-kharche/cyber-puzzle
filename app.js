@@ -44,7 +44,7 @@ class CyberPuzzleApp {
     bindEvents() {
         // --- UI Interactions ---
         this.ui.onGridChange = (size) => {
-            this.audio.init(); // Satisfy browser autoplay policies
+            this.audio.init(); 
             this.audio.playGrab();
             this.startNewGame(size);
         };
@@ -64,7 +64,6 @@ class CyberPuzzleApp {
             this.audio.init();
             this.audio.playGrab();
             this.isMirrored = !this.isMirrored;
-            // Toggle CSS transform on the canvas to mirror visual output
             const canvas = document.getElementById('game-canvas');
             canvas.style.transform = this.isMirrored ? 'scaleX(1)' : 'scaleX(-1)';
         };
@@ -87,16 +86,12 @@ class CyberPuzzleApp {
         this.tracker.onTrackingUpdate = (state) => {
             this.trackerState = state;
             this.ui.updateAIStatus(true);
-            this.handleGameLogic(); // Process drag & drop mechanics
+            this.handleGameLogic(); 
         };
 
         this.tracker.onTrackingLost = () => {
-            // We do NOT set this.trackerState to null anymore. 
-            // We keep the last known state so the tile floats right where you left it!
             this.ui.updateAIStatus(false);
-            
-            // Note: Removed the code that forced the tile to drop.
-            // Now, if tracking drops for a split second, you keep holding the piece.
+            // Tile drop logic removed here to allow temporal grace period
         };
     }
 
@@ -104,17 +99,14 @@ class CyberPuzzleApp {
      * Bootstraps the application, requests camera permissions, and starts the loops.
      */
     async start() {
-        // 1. Initialize Neural Network (Pre-compiles WebGL shaders to prevent lag)
         await this.tracker.initialize();
 
-        // 2. Start Camera Hardware
         const cameraStarted = await this.camera.start();
         
         if (cameraStarted) {
             this.ui.hideLoading();
-            this.startNewGame(3); // Start with Easy mode (3x3)
+            this.startNewGame(3); 
             
-            // 3. Kick off the visual render loop
             this.renderLoop(performance.now());
         }
     }
@@ -137,7 +129,6 @@ class CyberPuzzleApp {
 
     /**
      * Translates raw AI hand coordinates into puzzle grid interactions.
-     * Called asynchronously whenever the AI finishes processing a frame.
      */
     handleGameLogic() {
         if (!this.isGameActive || !this.trackerState) return;
@@ -146,21 +137,17 @@ class CyberPuzzleApp {
         const hoverIndex = this.puzzle.getIndexFromNormalizedCoords(cursor.x, cursor.y);
 
         if (this.trackerState.isPinching) {
-            // Attempt to grab a tile
             if (this.puzzle.draggedTileIndex === -1 && hoverIndex !== -1) {
                 const pickedUp = this.puzzle.pickTile(hoverIndex);
                 if (pickedUp) this.audio.playGrab();
             }
         } else {
-            // Attempt to drop a tile
             if (this.puzzle.draggedTileIndex !== -1) {
                 const dropped = this.puzzle.dropTile(hoverIndex);
                 
                 if (dropped) {
-                    // Check if the drop resulted in a locked (correct) placement
                     if (this.puzzle.tiles[hoverIndex] === hoverIndex) {
                         this.audio.playLock();
-                        // Calculate screen coordinates for the spark emission
                         const tileW = this.renderer.canvas.width / this.puzzle.gridSize;
                         const tileH = this.renderer.canvas.height / this.puzzle.gridSize;
                         const col = hoverIndex % this.puzzle.gridSize;
@@ -178,49 +165,42 @@ class CyberPuzzleApp {
      * Triggers the victory sequence.
      */
     handleVictory() {
-        this.isGameActive = false;
+        this.isGameActive = false; // This instantly unfreezes the camera!
         this.ui.stopTimer();
         this.audio.playVictory();
         
-        // Save score if it's a new personal best
         const isNewBest = saveScoreIfBest(this.puzzle.gridSize, this.ui.secondsElapsed, this.puzzle.moves);
         
         if (isNewBest) {
             this.ui.updateBestScore({ time: this.ui.secondsElapsed, moves: this.puzzle.moves });
         }
 
-        // Emit Confetti from the center of the screen
         const cw = this.renderer.canvas.width;
         const ch = this.renderer.canvas.height;
         this.particles.emitConfetti(cw / 2, ch);
 
-        // Display the victory overlay
         this.ui.showVictory(this.ui.secondsElapsed, this.puzzle.moves);
     }
 
     /**
-     * The continuous drawing loop. Runs at the monitor's refresh rate (e.g., 60/144 FPS).
+     * The continuous drawing loop. Runs at the monitor's refresh rate.
      * @param {number} timestamp 
      */
     renderLoop(timestamp) {
-        // Calculate dynamic FPS
         if (!this.lastTime) this.lastTime = timestamp;
         const deltaTime = timestamp - this.lastTime;
         this.lastTime = timestamp;
         
-        // Update FPS counter in UI (every ~10 frames to avoid flickering)
         if (Math.random() < 0.1) {
             const currentFps = Math.round(1000 / deltaTime);
             this.ui.updateFPS(currentFps);
         }
 
-        // Draw the puzzle, video feed, and cyber HUD
-        this.renderer.render(this.video, this.trackerState);
+        // 🔥 Passing this.isGameActive to the renderer for the snapshot feature 🔥
+        this.renderer.render(this.video, this.trackerState, this.isGameActive);
         
-        // Draw custom particles on top
         this.particles.render(this.renderer.ctx);
 
-        // Schedule next frame
         requestAnimationFrame((ts) => this.renderLoop(ts));
     }
 }
@@ -231,7 +211,6 @@ class CyberPuzzleApp {
 
 window.onload = () => {
     const app = new CyberPuzzleApp();
-    // Wait for a brief moment to allow CSS/Fonts to fully paint before kicking off heavy WebGL compilation
     setTimeout(() => {
         app.start();
     }, 500);
