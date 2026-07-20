@@ -91,13 +91,12 @@ class CyberPuzzleApp {
         };
 
         this.tracker.onTrackingLost = () => {
-            this.trackerState = null;
+            // We do NOT set this.trackerState to null anymore. 
+            // We keep the last known state so the tile floats right where you left it!
             this.ui.updateAIStatus(false);
             
-            // Drop any currently held tile if tracking is lost
-            if (this.puzzle.draggedTileIndex !== -1) {
-                this.puzzle.draggedTileIndex = -1;
-            }
+            // Note: Removed the code that forced the tile to drop.
+            // Now, if tracking drops for a split second, you keep holding the piece.
         };
     }
 
@@ -155,7 +154,6 @@ class CyberPuzzleApp {
         } else {
             // Attempt to drop a tile
             if (this.puzzle.draggedTileIndex !== -1) {
-                const previousTargetValue = hoverIndex !== -1 ? this.puzzle.tiles[hoverIndex] : null;
                 const dropped = this.puzzle.dropTile(hoverIndex);
                 
                 if (dropped) {
