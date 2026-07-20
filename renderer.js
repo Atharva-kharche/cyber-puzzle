@@ -14,18 +14,14 @@ export class Renderer {
      */
     constructor(mainCanvas, offscreenCanvas, puzzle) {
         this.canvas = mainCanvas;
-        this.ctx = this.canvas.getContext('2d', { alpha: false }); // alpha: false optimizes rendering if background is opaque
+        this.ctx = this.canvas.getContext('2d', { alpha: false }); 
         
         this.offscreenCanvas = offscreenCanvas;
-        // willReadFrequently is crucial here because we read from this buffer constantly to slice the image
         this.offCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: true });
         
         this.puzzle = puzzle;
-
-        // Animated drop logic (magnetic snapping)
         this.animatingTiles = new Map(); 
 
-        // Handle canvas resizing
         this.resize();
         window.addEventListener('resize', () => this.resize());
     }
@@ -50,7 +46,7 @@ export class Renderer {
         // 1. Buffer the video frame to the offscreen canvas (and mirror it)
         this.updateOffscreenBuffer(video);
 
-        // 2. Clear main canvas (not strictly needed if drawing full screen, but good practice)
+        // 2. Clear main canvas
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         const tileW = this.canvas.width / this.puzzle.gridSize;
@@ -78,11 +74,9 @@ export class Renderer {
         if (!video || video.readyState < 2) return;
         
         this.offCtx.save();
-        // Mirror the X axis so it acts like a real mirror
         this.offCtx.translate(this.offscreenCanvas.width, 0);
         this.offCtx.scale(-1, 1);
         
-        // Draw video stretching to fill (object-fit: cover equivalent logic can be added here if aspect ratios mismatch)
         this.offCtx.drawImage(video, 0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
         this.offCtx.restore();
     }
@@ -94,41 +88,33 @@ export class Renderer {
         const lockedTiles = this.puzzle.getLockedTiles();
 
         for (let i = 0; i < this.puzzle.tiles.length; i++) {
-            // Skip drawing the tile that is currently being picked up
             if (i === this.puzzle.draggedTileIndex) continue;
 
             const originalSlice = this.puzzle.tiles[i];
             
-            // Calculate destination (where it is on the screen right now)
             const destPos = this.puzzle.getColRowFromIndex(i);
             const dx = destPos.col * tileW;
             const dy = destPos.row * tileH;
 
-            // Calculate source (where this piece of the image originally came from)
             const srcPos = this.puzzle.getColRowFromIndex(originalSlice);
             const sx = srcPos.col * tileW;
             const sy = srcPos.row * tileH;
 
-            // Draw the slice from the offscreen buffer
             this.ctx.drawImage(this.offscreenCanvas, sx, sy, tileW, tileH, dx, dy, tileW, tileH);
 
-            // Draw Grid Lines / Borders
             this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
             this.ctx.lineWidth = 2;
             this.ctx.strokeRect(dx, dy, tileW, tileH);
 
-            // Visual feedback: Locked pieces glow green
+            // Visual feedback: Locked pieces get a clean border, NO tint
             if (lockedTiles.includes(i)) {
                 this.ctx.save();
-                this.ctx.strokeStyle = 'rgba(57, 255, 20, 0.6)'; // Neon Green
-                this.ctx.lineWidth = 4;
-                this.ctx.shadowBlur = 15;
-                this.ctx.shadowColor = 'rgba(57, 255, 20, 1)';
-                this.ctx.strokeRect(dx + 2, dy + 2, tileW - 4, tileH - 4); // Inset slightly
-                
-                // Slight green tint over the locked tile
-                this.ctx.fillStyle = 'rgba(57, 255, 20, 0.1)';
-                this.ctx.fillRect(dx, dy, tileW, tileH);
+                this.ctx.strokeStyle = '#39ff14'; // Bright Neon Green edge
+                this.ctx.lineWidth = 3;
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = '#39ff14';
+                // Inset the border slightly so it doesn't overlap adjacent tiles
+                this.ctx.strokeRect(dx + 1, dy + 1, tileW - 2, tileH - 2); 
                 this.ctx.restore();
             }
         }
@@ -144,18 +130,15 @@ export class Renderer {
         const sx = srcPos.col * tileW;
         const sy = srcPos.row * tileH;
 
-        // Center the dragged tile on the hand cursor
         const floatX = (cursor.x * this.canvas.width) - (tileW / 2);
         const floatY = (cursor.y * this.canvas.height) - (tileH / 2);
 
         this.ctx.save();
-        // Make the floating tile slightly transparent
         this.ctx.globalAlpha = 0.85;
         this.ctx.drawImage(this.offscreenCanvas, sx, sy, tileW, tileH, floatX, floatY, tileW, tileH);
         
-        // Cyberpunk Electric Glow Border
         this.ctx.globalAlpha = 1.0;
-        this.ctx.strokeStyle = '#00ffff'; // Cyan
+        this.ctx.strokeStyle = '#00ffff'; 
         this.ctx.lineWidth = 4;
         this.ctx.shadowBlur = 20;
         this.ctx.shadowColor = '#00ffff';
@@ -171,34 +154,30 @@ export class Renderer {
         const h = this.canvas.height;
 
         this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(184, 41, 234, 0.8)'; // Purple connections
+        this.ctx.strokeStyle = 'rgba(184, 41, 234, 0.8)'; 
         this.ctx.lineWidth = 2;
         this.ctx.shadowBlur = 10;
         this.ctx.shadowColor = '#b829ea';
 
-        // MediaPipe Hands Landmark Connections map
         const connections = [
-            [0,1],[1,2],[2,3],[3,4], // Thumb
-            [0,5],[5,6],[6,7],[7,8], // Index
-            [5,9],[9,10],[10,11],[11,12], // Middle
-            [9,13],[13,14],[14,15],[15,16], // Ring
-            [13,17],[0,17],[17,18],[18,19],[19,20] // Pinky & Palm base
+            [0,1],[1,2],[2,3],[3,4], 
+            [0,5],[5,6],[6,7],[7,8], 
+            [5,9],[9,10],[10,11],[11,12], 
+            [9,13],[13,14],[14,15],[15,16], 
+            [13,17],[0,17],[17,18],[18,19],[19,20] 
         ];
 
-        // Batch rendering lines (Performance optimization)
         this.ctx.beginPath();
         for (const [startIdx, endIdx] of connections) {
             const p1 = landmarks[startIdx];
             const p2 = landmarks[endIdx];
             
-            // X coordinates must be mirrored! (1 - x)
             this.ctx.moveTo((1 - p1.x) * w, p1.y * h);
             this.ctx.lineTo((1 - p2.x) * w, p2.y * h);
         }
         this.ctx.stroke();
 
-        // Draw glowing nodes at the joints
-        this.ctx.fillStyle = '#00ffff'; // Cyan nodes
+        this.ctx.fillStyle = '#00ffff'; 
         this.ctx.shadowColor = '#00ffff';
         this.ctx.beginPath();
         for (const p of landmarks) {
@@ -223,15 +202,14 @@ export class Renderer {
         this.ctx.save();
         this.ctx.lineWidth = 3;
         
-        // Color coding: Red = Locked/Grabbing, Green = Open/Ready
         if (trackerState.isPinching) {
-            this.ctx.strokeStyle = '#ff2a2a'; // Danger Red
+            this.ctx.strokeStyle = '#ff2a2a'; 
             this.ctx.shadowColor = '#ff2a2a';
         } else if (trackerState.canGrab) {
-            this.ctx.strokeStyle = '#39ff14'; // Success Green
+            this.ctx.strokeStyle = '#39ff14'; 
             this.ctx.shadowColor = '#39ff14';
         } else {
-            this.ctx.strokeStyle = '#ffff33'; // Warning Yellow (Resetting)
+            this.ctx.strokeStyle = '#ffff33'; 
             this.ctx.shadowColor = '#ffff33';
         }
         
