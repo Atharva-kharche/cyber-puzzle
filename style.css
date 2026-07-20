@@ -1,0 +1,325 @@
+/* ==========================================================================
+   CSS RESET & VARIABLES
+   ========================================================================== */
+:root {
+    /* Color Palette */
+    --bg-dark: #050508;
+    --cyan: #00ffff;
+    --cyan-glow: rgba(0, 255, 255, 0.6);
+    --purple: #b829ea;
+    --purple-glow: rgba(184, 41, 234, 0.6);
+    --white: #f0f0f0;
+    --danger: #ff2a2a;
+    --success: #39ff14;
+    
+    /* Glassmorphism */
+    --glass-bg: rgba(10, 15, 25, 0.45);
+    --glass-border: rgba(0, 255, 255, 0.15);
+    
+    /* Typography */
+    --font-mono: 'Courier New', Courier, monospace;
+    --font-sans: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--white);
+    font-family: var(--font-mono);
+    overflow: hidden; /* Prevent scrolling during gameplay */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ==========================================================================
+   MAIN APP CONTAINER & CANVAS
+   ========================================================================== */
+#app-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    max-width: 1200px; /* Cap width on ultra-wide screens */
+    max-height: 900px;
+    background: #000;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+}
+
+/* Make container responsive */
+@media (max-width: 1200px) {
+    #app-container {
+        max-width: 100vw;
+        max-height: calc(100vh - 40px); /* Leave room for footer */
+    }
+}
+
+video {
+    display: none; /* Keep hidden, used only for data */
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    /* Prevent default touch actions on mobile */
+    touch-action: none; 
+}
+
+/* ==========================================================================
+   GLASSMORPHISM & OVERLAYS
+   ========================================================================== */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+}
+
+/* ==========================================================================
+   TYPOGRAPHY & GLOW EFFECTS
+   ========================================================================== */
+.neon-text {
+    font-family: var(--font-sans);
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--white);
+    text-shadow: 0 0 10px var(--cyan-glow), 0 0 20px var(--cyan-glow);
+}
+
+.neon-text.warning {
+    color: var(--danger);
+    text-shadow: 0 0 10px rgba(255,42,42,0.6), 0 0 20px rgba(255,42,42,0.6);
+}
+
+.neon-text.success {
+    color: var(--success);
+    text-shadow: 0 0 10px rgba(57,255,20,0.6), 0 0 20px rgba(57,255,20,0.6);
+}
+
+.cyan { color: var(--cyan); text-shadow: 0 0 5px var(--cyan-glow); }
+.purple { color: var(--purple); text-shadow: 0 0 5px var(--purple-glow); }
+
+/* ==========================================================================
+   HUD (HEADS UP DISPLAY)
+   ========================================================================== */
+#hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let clicks pass through to canvas */
+    z-index: 20;
+    border: none;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+}
+
+.hud-section {
+    position: absolute;
+    padding: 20px;
+    pointer-events: auto; /* Re-enable clicks for buttons inside HUD */
+}
+
+.top-left { top: 0; left: 0; }
+.top-right { top: 0; right: 0; text-align: right; }
+.bottom-left { bottom: 0; left: 0; }
+.bottom-right { bottom: 0; right: 0; display: flex; flex-direction: column; align-items: flex-end;}
+
+.stat-box {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    display: inline-block;
+    min-width: 120px;
+}
+
+.stat-box .label { color: #888; margin-right: 8px; }
+.stat-box.right-align { text-align: right; }
+
+/* ==========================================================================
+   BRANDING / WATERMARK
+   ========================================================================== */
+.watermark {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+.watermark:hover { opacity: 1; }
+
+.brand-sub {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #888;
+}
+
+.brand-name {
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
+.mt-2 { margin-top: 10px; }
+.mt-4 { margin-top: 20px; }
+
+.cyber-btn {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    padding: 8px 16px;
+    font-family: var(--font-mono);
+    font-weight: bold;
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.1) inset;
+}
+
+.cyber-btn:hover {
+    background: rgba(0, 255, 255, 0.15);
+    box-shadow: 0 0 15px var(--cyan-glow) inset, 0 0 10px var(--cyan-glow);
+}
+
+.cyber-btn.active {
+    background: var(--cyan);
+    color: #000;
+    box-shadow: 0 0 15px var(--cyan-glow);
+}
+
+.cyber-btn.action {
+    border-color: var(--purple);
+    color: var(--purple);
+}
+.cyber-btn.action:hover {
+    background: rgba(184, 41, 234, 0.15);
+    box-shadow: 0 0 15px var(--purple-glow) inset, 0 0 10px var(--purple-glow);
+}
+
+.cyber-btn.large {
+    font-size: 16px;
+    padding: 12px 24px;
+}
+
+/* ==========================================================================
+   LOADING SPINNER
+   ========================================================================== */
+.loader-content {
+    text-align: center;
+}
+
+.cyber-spinner {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 20px auto;
+    border: 4px solid transparent;
+    border-top: 4px solid var(--cyan);
+    border-right: 4px solid var(--purple);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 15px var(--cyan-glow), inset 0 0 15px var(--purple-glow);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#loading-status {
+    margin-top: 10px;
+    color: #888;
+    font-size: 14px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* ==========================================================================
+   FOOTER
+   ========================================================================== */
+footer {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   MOBILE RESPONSIVENESS
+   ========================================================================== */
+@media (max-width: 768px) {
+    .hud-section { padding: 10px; }
+    
+    .stat-box {
+        min-width: 80px;
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    .cyber-btn { padding: 6px 10px; font-size: 10px; }
+    .brand-name { font-size: 11px; }
+    
+    .top-left { display: flex; gap: 5px; flex-wrap: wrap; width: 60%; }
+    .stat-box { margin-bottom: 0; }
+    
+    .btn-group { flex-wrap: wrap; }
+}
