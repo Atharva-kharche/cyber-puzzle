@@ -33,6 +33,7 @@ class CyberPuzzleApp {
         // Application State
         this.trackerState = null;
         this.isGameActive = false;
+        this.forceSnapshot = false; // Prevents the black screen on load
         this.isMirrored = true; // Default to mirror mode for intuitive controls
         
         this.bindEvents();
@@ -117,6 +118,7 @@ class CyberPuzzleApp {
      */
     startNewGame(size) {
         this.isGameActive = true;
+        this.forceSnapshot = true; // Tell the renderer to grab a new image!
         this.particles.clear();
         this.ui.hideVictory();
         this.ui.resetTimer();
@@ -196,8 +198,11 @@ class CyberPuzzleApp {
             this.ui.updateFPS(currentFps);
         }
 
-        // 🔥 Passing this.isGameActive to the renderer for the snapshot feature 🔥
-        this.renderer.render(this.video, this.trackerState, this.isGameActive);
+        // 🔥 Pass the forceSnapshot flag to the renderer 🔥
+        this.renderer.render(this.video, this.trackerState, this.isGameActive, this.forceSnapshot);
+        
+        // Turn the snapshot override off immediately so it freezes on the next frame
+        this.forceSnapshot = false; 
         
         this.particles.render(this.renderer.ctx);
 
