@@ -33,15 +33,12 @@ class CyberPuzzleApp {
         // Application State
         this.trackerState = null;
         this.isGameActive = false;
-        this.forceSnapshot = false; // Prevents the black screen on load
-        this.isMirrored = true; // Default to mirror mode for intuitive controls
+        this.forceSnapshot = false; 
+        this.isMirrored = true; 
         
         this.bindEvents();
     }
 
-    /**
-     * Wires up the Pub/Sub callbacks between the UI, Puzzle logic, and AI Tracker.
-     */
     bindEvents() {
         // --- UI Interactions ---
         this.ui.onGridChange = (size) => {
@@ -73,7 +70,6 @@ class CyberPuzzleApp {
         this.puzzle.onMove = (moves) => {
             this.ui.updateMoves(moves);
             
-            // First move starts the timer
             if (moves === 1 && this.isGameActive) {
                 this.ui.startTimer();
             }
@@ -92,13 +88,9 @@ class CyberPuzzleApp {
 
         this.tracker.onTrackingLost = () => {
             this.ui.updateAIStatus(false);
-            // Tile drop logic removed here to allow temporal grace period
         };
     }
 
-    /**
-     * Bootstraps the application, requests camera permissions, and starts the loops.
-     */
     async start() {
         await this.tracker.initialize();
 
@@ -106,19 +98,21 @@ class CyberPuzzleApp {
         
         if (cameraStarted) {
             this.ui.hideLoading();
-            this.startNewGame(3); 
             
+            // KICK OFF RENDERER IMMEDIATELY so the user sees the live camera feed
             this.renderLoop(performance.now());
+
+            // WARM-UP DELAY: Give the physical webcam 1.5 seconds to turn on, 
+            // adjust auto-exposure, and balance colors BEFORE we take the first snapshot.
+            setTimeout(() => {
+                this.startNewGame(3); 
+            }, 1500);
         }
     }
 
-    /**
-     * Resets the board and initiates a fresh puzzle.
-     * @param {number} size 
-     */
     startNewGame(size) {
         this.isGameActive = true;
-        this.forceSnapshot = true; // Tell the renderer to grab a new image!
+        this.forceSnapshot = true; 
         this.particles.clear();
         this.ui.hideVictory();
         this.ui.resetTimer();
@@ -129,9 +123,6 @@ class CyberPuzzleApp {
         this.ui.updateBestScore(bestScore);
     }
 
-    /**
-     * Translates raw AI hand coordinates into puzzle grid interactions.
-     */
     handleGameLogic() {
         if (!this.isGameActive || !this.trackerState) return;
 
@@ -163,11 +154,8 @@ class CyberPuzzleApp {
         }
     }
 
-    /**
-     * Triggers the victory sequence.
-     */
     handleVictory() {
-        this.isGameActive = false; // This instantly unfreezes the camera!
+        this.isGameActive = false; 
         this.ui.stopTimer();
         this.audio.playVictory();
         
@@ -184,10 +172,6 @@ class CyberPuzzleApp {
         this.ui.showVictory(this.ui.secondsElapsed, this.puzzle.moves);
     }
 
-    /**
-     * The continuous drawing loop. Runs at the monitor's refresh rate.
-     * @param {number} timestamp 
-     */
     renderLoop(timestamp) {
         if (!this.lastTime) this.lastTime = timestamp;
         const deltaTime = timestamp - this.lastTime;
@@ -198,11 +182,13 @@ class CyberPuzzleApp {
             this.ui.updateFPS(currentFps);
         }
 
-        // 🔥 Pass the forceSnapshot flag to the renderer 🔥
         this.renderer.render(this.video, this.trackerState, this.isGameActive, this.forceSnapshot);
         
-        // Turn the snapshot override off immediately so it freezes on the next frame
-        this.forceSnapshot = false; 
+        // SAFETY CHECK: Only turn off the snapshot override IF the video is actually delivering light/pixels.
+        // readyState >= 2 means the browser has enough data to draw the current frame.
+        if (this.forceSnapshot && this.video.readyState >= 2) {
+            this.forceSnapshot = false; 
+        }
         
         this.particles.render(this.renderer.ctx);
 
