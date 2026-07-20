@@ -41,10 +41,11 @@ export class Renderer {
      * Main Render Loop. Should be called exactly once per frame.
      * @param {HTMLVideoElement} video - The raw webcam feed.
      * @param {Object} trackerState - { cursor, isPinching, landmarks }
+     * @param {boolean} isGameActive - Tells the renderer if the puzzle is currently being played
      */
-    render(video, trackerState) {
-        // 1. Buffer the video frame to the offscreen canvas (and mirror it)
-        this.updateOffscreenBuffer(video);
+    render(video, trackerState, isGameActive) {
+        // 1. Buffer the video frame to the offscreen canvas (and freeze if playing)
+        this.updateOffscreenBuffer(video, isGameActive);
 
         // 2. Clear main canvas
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -68,10 +69,14 @@ export class Renderer {
     }
 
     /**
-     * Flips and draws the raw video frame into memory.
+     * Flips and draws the raw video frame into memory. 
+     * Stops updating if a game is active to create a snapshot effect.
      */
-    updateOffscreenBuffer(video) {
+    updateOffscreenBuffer(video, isGameActive) {
         if (!video || video.readyState < 2) return;
+        
+        // 🔥 FREEZE FRAME MAGIC 🔥
+        if (isGameActive) return;
         
         this.offCtx.save();
         this.offCtx.translate(this.offscreenCanvas.width, 0);
