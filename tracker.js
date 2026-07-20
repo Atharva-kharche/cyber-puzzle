@@ -19,15 +19,19 @@ export class HandTracker {
         this.isPinching = false;
         this.canGrab = true;
         
-        // THRESHOLD FIX: Increased so you don't have to pinch as tightly!
+        // Thresholds
         this.PINCH_THRESHOLD = 0.06; 
         this.OPEN_THRESHOLD = 0.10;  
         
-        this.CURSOR_SMOOTHING = 0.6;
+        // Smoothing (Lowered cursor smoothing slightly for a snappier, faster drag)
+        this.CURSOR_SMOOTHING = 0.45;
         this.PINCH_SMOOTHING = 0.7;
 
         this.onTrackingUpdate = null;
         this.onTrackingLost = null;
+        
+        // Timer to prevent micro-drops from motion blur
+        this.lostTimer = null;
     }
 
     async initialize() {
@@ -40,9 +44,9 @@ export class HandTracker {
         this.handsAI.setOptions({
             maxNumHands: 1, 
             modelComplexity: 1,
-            // CONFIDENCE FIX: Lowered to 0.5 so it stops losing your hand during a pinch
+            // Lowered tracking confidence drastically so it tolerates fast motion blur
             minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minTrackingConfidence: 0.35 
         });
 
         this.handsAI.onResults((results) => this.processResults(results));
@@ -58,6 +62,13 @@ export class HandTracker {
 
     processResults(results) {
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            
+            // If the hand is found, immediately cancel any tracking loss timers!
+            if (this.lostTimer) {
+                clearTimeout(this.lostTimer);
+                this.lostTimer = null;
+            }
+
             const hand = results.multiHandLandmarks[0];
             
             const indexTip = hand[8];
@@ -104,14 +115,19 @@ export class HandTracker {
             }
 
         } else {
-            // Hand left the camera view
-            if (this.handVisible) {
-                this.handVisible = false;
-                
-                // Do NOT reset the pinch state immediately, acts as a grace period
-                if (this.onTrackingLost) {
-                    this.onTrackingLost();
-                }
+            // Hand is lost from camera view due to motion blur or leaving the frame.
+            // Start a 400ms grace period timer before we actually tell the game we lost it.
+            if (this.handVisible && !this.lostTimer) {
+                this.lostTimer = setTimeout(() => {
+                    this.handVisible = false;
+                    this.isPinching = false;
+                    this.canGrab = true;
+                    
+                    if (this.onTrackingLost) {
+                        this.onTrackingLost();
+                    }
+                    this.lostTimer = null;
+                }, 400); // 400 milliseconds of leniency
             }
         }
     }
