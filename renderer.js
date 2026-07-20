@@ -42,10 +42,11 @@ export class Renderer {
      * @param {HTMLVideoElement} video - The raw webcam feed.
      * @param {Object} trackerState - { cursor, isPinching, landmarks }
      * @param {boolean} isGameActive - Tells the renderer if the puzzle is currently being played
+     * @param {boolean} forceSnapshot - Forces the buffer to update even if the game is active
      */
-    render(video, trackerState, isGameActive) {
+    render(video, trackerState, isGameActive, forceSnapshot) {
         // 1. Buffer the video frame to the offscreen canvas (and freeze if playing)
-        this.updateOffscreenBuffer(video, isGameActive);
+        this.updateOffscreenBuffer(video, isGameActive, forceSnapshot);
 
         // 2. Clear main canvas
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -72,11 +73,12 @@ export class Renderer {
      * Flips and draws the raw video frame into memory. 
      * Stops updating if a game is active to create a snapshot effect.
      */
-    updateOffscreenBuffer(video, isGameActive) {
+    updateOffscreenBuffer(video, isGameActive, forceSnapshot) {
         if (!video || video.readyState < 2) return;
         
-        // 🔥 FREEZE FRAME MAGIC 🔥
-        if (isGameActive) return;
+        // 🔥 FREEZE FRAME MAGIC (with Snapshot Override) 🔥
+        // If the game is active, ONLY update if we are forcing a new snapshot
+        if (isGameActive && !forceSnapshot) return;
         
         this.offCtx.save();
         this.offCtx.translate(this.offscreenCanvas.width, 0);
