@@ -1,6 +1,6 @@
 /**
  * tracker.js
- * Handles MediaPipe Hands AI, gesture recognition, and temporal smoothing.
+ * Optimized for low-end hardware and minimal physical strain.
  */
 
 import { lerp } from './utils.js';
@@ -10,27 +10,21 @@ export class HandTracker {
         this.handsAI = null;
         this.isInitialized = false;
         
-        // Tracking State
         this.handVisible = false;
         this.cursor = { x: 0.5, y: 0.5 };
         
-        // Pinch & Grab State
         this.smoothPinchDist = 0.1;
         this.isPinching = false;
         this.canGrab = true;
         
-        // Thresholds
         this.PINCH_THRESHOLD = 0.06; 
         this.OPEN_THRESHOLD = 0.10;  
         
-        // Smoothing (Lowered cursor smoothing slightly for a snappier, faster drag)
-        this.CURSOR_SMOOTHING = 0.45;
+        this.CURSOR_SMOOTHING = 0.5;
         this.PINCH_SMOOTHING = 0.7;
 
         this.onTrackingUpdate = null;
         this.onTrackingLost = null;
-        
-        // Timer to prevent micro-drops from motion blur
         this.lostTimer = null;
     }
 
@@ -43,15 +37,15 @@ export class HandTracker {
 
         this.handsAI.setOptions({
             maxNumHands: 1, 
-            modelComplexity: 1,
-            // Lowered tracking confidence drastically so it tolerates fast motion blur
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.35 
+            // CRITICAL FIX: Changed from 1 to 0. This uses the 'Lite' AI model, 
+            // which is drastically faster and should fix your 12 FPS issue.
+            modelComplexity: 0, 
+            minDetectionConfidence: 0.4,
+            minTrackingConfidence: 0.3 
         });
 
         this.handsAI.onResults((results) => this.processResults(results));
         await this.handsAI.initialize(); 
-        
         this.isInitialized = true;
     }
 
@@ -63,19 +57,23 @@ export class HandTracker {
     processResults(results) {
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             
-            // If the hand is found, immediately cancel any tracking loss timers!
             if (this.lostTimer) {
                 clearTimeout(this.lostTimer);
                 this.lostTimer = null;
             }
 
             const hand = results.multiHandLandmarks[0];
-            
             const indexTip = hand[8];
             const thumbTip = hand[4];
 
-            const rawX = 1.0 - ((indexTip.x + thumbTip.x) / 2);
-            const rawY = (indexTip.y + thumbTip.y) / 2;
+            // 1. Calculate raw center
+            let rawX = 1.0 - ((indexTip.x + thumbTip.x) / 2);
+            let rawY = (indexTip.y + thumbTip.y) / 2;
+
+            // 2. MULTIPLIER FIX: Multiply movement by 1.5x. 
+            // You now only need to move your hand a short distance to cross the whole screen.
+            rawX = (rawX - 0.5) * 1.5 + 0.5;
+            rawY = (rawY - 0.5) * 1.5 + 0.5;
 
             const dx = (1.0 - indexTip.x) - (1.0 - thumbTip.x);
             const dy = indexTip.y - thumbTip.y;
@@ -115,8 +113,6 @@ export class HandTracker {
             }
 
         } else {
-            // Hand is lost from camera view due to motion blur or leaving the frame.
-            // Start a 400ms grace period timer before we actually tell the game we lost it.
             if (this.handVisible && !this.lostTimer) {
                 this.lostTimer = setTimeout(() => {
                     this.handVisible = false;
@@ -127,7 +123,7 @@ export class HandTracker {
                         this.onTrackingLost();
                     }
                     this.lostTimer = null;
-                }, 400); // 400 milliseconds of leniency
+                }, 400); 
             }
         }
     }
