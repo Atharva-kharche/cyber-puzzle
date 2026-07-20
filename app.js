@@ -36,6 +36,10 @@ class CyberPuzzleApp {
         this.forceSnapshot = false; 
         this.isMirrored = true; 
         
+        // New State for "Photo Booth" UX
+        this.waitingForHandToStart = false; 
+        this.pendingGridSize = 3;
+        
         this.bindEvents();
     }
 
@@ -44,13 +48,13 @@ class CyberPuzzleApp {
         this.ui.onGridChange = (size) => {
             this.audio.init(); 
             this.audio.playGrab();
-            this.startNewGame(size);
+            this.queueNewGame(size); // Queue instead of instantly starting!
         };
 
         this.ui.onShuffle = () => {
             this.audio.init();
             this.audio.playDrop();
-            this.startNewGame(this.puzzle.gridSize);
+            this.queueNewGame(this.puzzle.gridSize);
         };
 
         this.ui.onSoundToggle = () => {
@@ -69,7 +73,6 @@ class CyberPuzzleApp {
         // --- Puzzle Logic Hooks ---
         this.puzzle.onMove = (moves) => {
             this.ui.updateMoves(moves);
-            
             if (moves === 1 && this.isGameActive) {
                 this.ui.startTimer();
             }
@@ -83,7 +86,14 @@ class CyberPuzzleApp {
         this.tracker.onTrackingUpdate = (state) => {
             this.trackerState = state;
             this.ui.updateAIStatus(true);
-            this.handleGameLogic(); 
+            
+            // 🔥 THE MAGIC SNAPSHOT TRIGGER 🔥
+            // If we are waiting for a hand to start the game, take the photo NOW!
+            if (this.waitingForHandToStart) {
+                this.executeNewGame();
+            } else {
+                this.handleGameLogic(); 
+            }
         };
 
         this.tracker.onTrackingLost = () => {
@@ -99,27 +109,42 @@ class CyberPuzzleApp {
         if (cameraStarted) {
             this.ui.hideLoading();
             
-            // KICK OFF RENDERER IMMEDIATELY so the user sees the live camera feed
+            // Boot straight into live posing mode
+            this.queueNewGame(3); 
             this.renderLoop(performance.now());
-
-            // WARM-UP DELAY: Give the physical webcam 1.5 seconds to turn on, 
-            // adjust auto-exposure, and balance colors BEFORE we take the first snapshot.
-            setTimeout(() => {
-                this.startNewGame(3); 
-            }, 1500);
         }
     }
 
-    startNewGame(size) {
-        this.isGameActive = true;
-        this.forceSnapshot = true; 
+    /**
+     * Puts the app in "Live Posing Mode". The camera is unfrozen,
+     * and it waits for the user to raise their hand.
+     */
+    queueNewGame(size) {
+        this.pendingGridSize = size;
+        this.waitingForHandToStart = true;
+        this.isGameActive = false; // Camera goes LIVE!
+        
         this.particles.clear();
         this.ui.hideVictory();
+        
+        // Fake a solved grid so the user sees a clear, unscrambled live feed to pose with
+        this.puzzle.gridSize = size;
+        this.puzzle.tiles = Array.from({length: size * size}, (_, i) => i);
+        this.puzzle.draggedTileIndex = -1;
+    }
+
+    /**
+     * Takes the snapshot, freezes the camera, and scrambles the puzzle pieces.
+     */
+    executeNewGame() {
+        this.waitingForHandToStart = false;
+        this.isGameActive = true;  // FREEZES the camera!
+        this.forceSnapshot = true; // Captures the perfect frame!
+        
         this.ui.resetTimer();
+        this.puzzle.initialize(this.pendingGridSize); // Actually scramble the board
         
-        this.puzzle.initialize(size);
-        
-        const bestScore = getBestScore(size);
+        const bestScore = getBestScore(this.pendingGridSize);
         this.ui.updateBestScore(bestScore);
     }
 
@@ -155,7 +180,9 @@ class CyberPuzzleApp {
     }
 
     handleVictory() {
+        // Instantly unfreeze the camera behind the confetti!
         this.isGameActive = false; 
+        
         this.ui.stopTimer();
         this.audio.playVictory();
         
@@ -184,8 +211,7 @@ class CyberPuzzleApp {
 
         this.renderer.render(this.video, this.trackerState, this.isGameActive, this.forceSnapshot);
         
-        // SAFETY CHECK: Only turn off the snapshot override IF the video is actually delivering light/pixels.
-        // readyState >= 2 means the browser has enough data to draw the current frame.
+        // Turn off the snapshot override only if we successfully grabbed a lit frame
         if (this.forceSnapshot && this.video.readyState >= 2) {
             this.forceSnapshot = false; 
         }
